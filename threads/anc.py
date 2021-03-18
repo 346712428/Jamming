@@ -16,6 +16,7 @@ class ActiveNoiseControl(threading.Thread):
         self.chirp_noise_length = chirp_noise_length
         self.simulation_length = simulation_length
         self.H = np.array([])
+        self.ls = 0x3fffffff
         self.exit_flag = False
 
         self.start()
@@ -137,12 +138,41 @@ class ActiveNoiseControl(threading.Thread):
         self.rfs1 = np.concatenate((self.rfs1,reality_frames))
         self.ifs1 = np.concatenate((self.ifs1,ideal_frames))
 
+        # 最小二乘法
+        # 取最小的信号采样长度
+        if self.H.size != 0:
+            return
+        else:
+            n = min((self.rfs1).shape[0], (self.ifs1).shape[0])
+
+        self.rfs1 = (self.rfs1[:n])
+        self.ifs1 = self.ifs1[:n]
+        # 对角矩阵逆直接对每个元素求倒数
+        for i in range(0, n):
+            if self.ifs1[i] != 0:
+                self.ifs1[i] = 1.0 / self.ifs1[i]
+        self.H = self.rfs1 * self.ifs1
+        print(self.H)
+
+
     def eliminate_noise(self, reality_frames, ideal_frames):
         logging.info("System Clock-{}(s)-Eliminate noise".format(
             round(global_var.run_time, 2)))
         self.rfs2 = np.concatenate((self.rfs2,reality_frames))
         self.ifs2 = np.concatenate((self.ifs2,ideal_frames))
-        return np.random.rand(1000)
+        # return np.random.rand(1000)
+
+        n = min(self.rfs2.size, self.ifs2.size, self.H.size)
+        self.rfs2 = self.rfs2[:n]
+        self.ifs2 = self.ifs2[:n]
+        H = self.H[:n]
+        ideal_audio = np.array([])
+        for i in range(0, n):
+            if H[i] != 0:
+                H[i] = 1.0 / H[i]
+        ideal_audio = self.rfs2 * H - self.ifs2
+        return ideal_audio
+
 
     def _resample(self, frames, src_fs, dst_fs):
         return signal.resample(frames, int(frames.size / src_fs * dst_fs))

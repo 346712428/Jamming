@@ -1,3 +1,2 @@
-from tests.test_pool import *
-
+from tests_file.test_ce_ne import run
 run()
